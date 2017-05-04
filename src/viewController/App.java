@@ -1,3 +1,4 @@
+package viewController;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.EventQueue;
@@ -22,18 +23,26 @@ import javax.swing.ScrollPaneConstants;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 import net.sf.image4j.codec.ico.ICODecoder;
+import utils.GrayScaleConverter;
+import utils.ImageFilter;
+import utils.ImageResizer;
 
 public class App implements ActionListener {
 
 	private JFrame mainWindow;
 	private JButton loadImage;
-	private final File userDir = new File("/Users/admin/Desktop");
+	private JButton loadTexture;
+	private final String userDirLocation = System.getProperty("user.dir");
+	private final File userDir = new File(userDirLocation);
 	private final FileNameExtensionFilter filter = new FileNameExtensionFilter("images", "jpg", "gif", "png", "bmp",
 			"ico");
+	private final FileNameExtensionFilter pngFilter = new FileNameExtensionFilter("images", "png");
 	private BufferedImage loadedImage;
+	private BufferedImage texture;
 	private JLayeredPane imagePane;
 	private JScrollPane imageScrollPane;
 	private JLabel imageLabel;
+	private JLabel textureLabel;
 	private JButton applyFilter;
 
 	public static void main(String[] args) {
@@ -41,8 +50,8 @@ public class App implements ActionListener {
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					App clipper = new App();
-					clipper.initialise();
+					App editor = new App();
+					editor.initialise();
 
 				} catch (Exception e) {
 
@@ -65,6 +74,8 @@ public class App implements ActionListener {
 		loadImage.setBounds(15, 15, 120, 40);
 		applyFilter = makeButton("apply filter");
 		applyFilter.setBounds(150, 15, 120, 40);
+		loadTexture = makeButton("load texture");
+		loadTexture.setBounds(285, 15, 120, 40);
 		imagePane = new JLayeredPane();
 
 		imageScrollPane = new JScrollPane(imagePane);
@@ -72,8 +83,8 @@ public class App implements ActionListener {
 		imageScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 		imageScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 
-		// imageScrollPane.getViewport().setBackground(Color.black);
 		mainWindow.getContentPane().add(loadImage);
+		mainWindow.getContentPane().add(loadTexture);
 	}
 
 	private JButton makeButton(String text) {
@@ -90,12 +101,37 @@ public class App implements ActionListener {
 	public void actionPerformed(ActionEvent event) {
 		String action = event.getActionCommand();
 		switch (action) {
-		case "load image":
-
+		case "load texture":
 			JFileChooser chooser = new JFileChooser(userDir);
-			chooser.setFileFilter(filter);
+			chooser.setFileFilter(pngFilter);
 			int returnVal = chooser.showSaveDialog(mainWindow);
-
+			if (returnVal == JFileChooser.APPROVE_OPTION) {
+				String path = chooser.getSelectedFile().getAbsolutePath();
+				File file = new File(path);
+				try {
+					texture = null;
+					if(textureLabel != null) {
+						mainWindow.getContentPane().remove(textureLabel);
+					}
+					textureLabel = null;
+					texture = ImageIO.read(file);
+					textureLabel = new JLabel(new ImageIcon(ImageResizer.resizeImage(texture, texture.getType(), 60, 60)));
+					textureLabel.setBounds(420, 5, 60, 60);
+					
+					mainWindow.repaint();
+					mainWindow.revalidate();
+					mainWindow.getContentPane().add(textureLabel);
+					textureLabel.setVisible(false);
+					textureLabel.setVisible(true);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			break;
+		case "load image":
+			chooser = new JFileChooser(userDir);
+			chooser.setFileFilter(filter);
+			returnVal = chooser.showSaveDialog(mainWindow);
 			if (returnVal == JFileChooser.APPROVE_OPTION) {
 				String path = chooser.getSelectedFile().getAbsolutePath();
 				File file = new File(path);
@@ -130,6 +166,8 @@ public class App implements ActionListener {
 					imageScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 					imageScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 					mainWindow.getContentPane().add(imageScrollPane);
+					imageScrollPane.setVisible(false);
+					imageScrollPane.setVisible(true);
 				} catch (IOException e) {
 
 				}
@@ -137,7 +175,10 @@ public class App implements ActionListener {
 			}
 			break;
 		case "apply filter":
-			convertToGray(loadedImage);
+			loadedImage = GrayScaleConverter.convertToGrayScale(loadedImage);
+			if(loadedImage != null && texture != null) {
+				ImageFilter.applyTexture(texture, loadedImage);
+			}
 			mainWindow.getContentPane().remove(imageScrollPane);
 			mainWindow.repaint();
 			mainWindow.revalidate();
@@ -153,35 +194,11 @@ public class App implements ActionListener {
 			imageScrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 			imageScrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
 			mainWindow.getContentPane().add(imageScrollPane);
+			imageScrollPane.setVisible(false);
+			imageScrollPane.setVisible(true);
 			break;
 		}
 
 	}
 
-	public void convertToGray(BufferedImage image) {
-		int width = image.getWidth();
-		int height = image.getHeight();
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				if(!isTransparent(x,y)) {
-					Color c = new Color(image.getRGB(x, y));
-					int red = (int) (c.getRed() * 0.21);
-					int green = (int) (c.getGreen() * 0.72);
-					int blue = (int) (c.getBlue() * 0.07);
-					int sum = red + green + blue;
-					Color newColor = new Color(sum, sum, sum);
-					image.setRGB(x, y, newColor.getRGB());
-				}
-			}
-		}
-	}
-
-	public boolean isTransparent(int x, int y) {
-		int pixel = loadedImage.getRGB(x, y);
-		if ((pixel >> 24) == 0x00) {
-			return true;
-		} else {
-			return false;
-		}
-	}
 }
